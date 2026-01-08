@@ -14,8 +14,8 @@ void Canvas::paintEvent(QPaintEvent *)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // Draw lines
-    painter.setPen(QPen(Qt::black, 5));
+    // Draw lines nigga
+    painter.setPen(QPen(Qt::black, 15));
     for (const Line &line : lines) {
         painter.drawLine(line.start, line.end);
     }
