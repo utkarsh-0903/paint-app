@@ -3,64 +3,89 @@
 #include <QMouseEvent>
 
 Canvas::Canvas(QWidget *parent)
-    : QWidget(parent), drawing(false)
+    : QWidget(parent),
+    m_color(Qt::red),
+    m_brushSize(12),
+    m_eraser(false)
 {
     setAttribute(Qt::WA_StaticContents);
-    setStyleSheet("background-color: white;");
+    m_image = QImage(size(), QImage::Format_ARGB32_Premultiplied);
+    m_image.fill(Qt::transparent);
+}
+
+void Canvas::setBrushColor(const QColor &color)
+{
+    m_color = color;
+    m_eraser = false;
+}
+
+void Canvas::setBrushSize(int size)
+{
+    m_brushSize = size;
+}
+
+void Canvas::setEraser(bool enabled)
+{
+    m_eraser = enabled;
+}
+
+void Canvas::clearCanvas()
+{
+    m_image.fill(Qt::transparent);
+    update();
 }
 
 void Canvas::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-
-    // Draw lines nigga
-    painter.setPen(QPen(Qt::black, 15));
-    for (const Line &line : lines) {
-        painter.drawLine(line.start, line.end);
-    }
-
-    // Draw version text (bottom-right)
-    QString versionText = "alpha 0.0.1";
-
-    QFont font;
-    font.setPointSize(10);
-    painter.setFont(font);
-    painter.setPen(Qt::black);
-
-    QRect rect = painter.viewport();
-    painter.drawText(
-        rect.adjusted(0, 0, -10, -10),
-        Qt::AlignBottom | Qt::AlignRight,
-        versionText
-        );
+    painter.drawImage(0, 0, m_image);
 }
-
 
 void Canvas::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        drawing = true;
-        lastPoint = event->pos();
+        m_lastPos = event->pos();
+        drawAt(m_lastPos);
     }
 }
 
 void Canvas::mouseMoveEvent(QMouseEvent *event)
 {
-    if (drawing) {
-        Line line;
-        line.start = lastPoint;
-        line.end = event->pos();
-        lines.append(line);
-
-        lastPoint = event->pos();
-        update(); // repaint
+    if (event->buttons() & Qt::LeftButton) {
+        drawAt(event->pos());
+        m_lastPos = event->pos();
     }
 }
 
-void Canvas::mouseReleaseEvent(QMouseEvent *event)
+void Canvas::resizeEvent(QResizeEvent *event)
 {
-    if (event->button() == Qt::LeftButton) {
-        drawing = false;
+    if (width() > m_image.width() || height() > m_image.height()) {
+        QImage newImage(event->size(), QImage::Format_ARGB32_Premultiplied);
+        newImage.fill(Qt::transparent);
+
+        QPainter p(&newImage);
+        p.drawImage(0, 0, m_image);
+        m_image = newImage;
     }
+    QWidget::resizeEvent(event);
+}
+
+void Canvas::drawAt(const QPoint &pos)
+{
+    QPainter painter(&m_image);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    if (m_eraser) {
+        painter.setCompositionMode(QPainter::CompositionMode_Clear);
+        painter.setBrush(Qt::transparent);
+    } else {
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        painter.setBrush(m_color);
+    }
+
+    painter.setPen(Qt::NoPen);
+    painter.drawEllipse(pos, m_brushSize / 2, m_brushSize / 2);
+
+    update(QRect(pos - QPoint(m_brushSize, m_brushSize),
+                 pos + QPoint(m_brushSize, m_brushSize)));
 }
